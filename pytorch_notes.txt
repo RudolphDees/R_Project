@@ -1,0 +1,65 @@
+Link to YouTube Tutorial: https://www.youtube.com/watch?v=exaWOE8jvy8&list=PLqnslRFeH2UrcDBWF5mfPGpqQDSta6VK4&index=2
+
+Episode 1 (Installation and Intro)
+
+    Go to the official website for help
+
+    Command is "pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117"
+
+    I can't use Cuda since I don't have an Nvidia GPU
+
+
+
+Episode 2 (Tensor Basics)
+
+    In pytorch everything is based on Tensor Operations, Can be n-dimensional
+
+    torch.empty(x,y,...) will make a Tensor with any number of dimensions where x and y are the size of each dimension.
+
+    torch.empty(2,2) is a 2 by 2 Tensor
+
+    dtype can be used to specify the variable type used in the Tensor (torch.empty(x,y, dtype=torch.float16))
+
+    Tensors can be made from lists just like how you'd expect it to work
+     
+    Operations  
+
+        Addition, Subtraction, Multiplication, Division
+
+        Slicing works similarly to arrays with colons and such
+
+        Reshaping with the view method. The values must fit unless if you start with a -1. Then pytorch will do it for you.
+
+        Converting from a numpy tensor to a pytorch one
+        
+            the numpy() method converts from tensor to a numpy array
+
+            from_numpy() method converts from numpy array to a tensor
+
+            
+    
+    EVERY FUNCTION THAT HAS A TRAILING _ WILL BE AN IN PLACE OPERATION. 
+
+
+
+Episode 3 ()
+
+Episode 4 ()
+
+Episode 5 ()
+
+Episode 6 ()
+
+Episode 7 ()
+
+Episode 8 ()
+
+Episode 9 ()
+
+Episode 10 ()
+
+Episode 11 ()
+
+Episode 12 ()
+
+Episode 13 ()
