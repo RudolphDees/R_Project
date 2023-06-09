@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 from datetime import datetime
 
-
+# This is the url for gathering game play data: https://statsapi.web.nhl.com/api/v1/game/ID/feed/live
 URL_FOR_GAME_DATA_GATHERING = "https://statsapi.web.nhl.com/api/v1/schedule?startDate=2021-08-01&endDate=2022-08-01&?expand=schedule.linescore"
 
 # DICT ATTRIBUTES
@@ -35,6 +35,7 @@ GAME_DATE = "gameDate"
 
 # FILE LOCATIONS
 GAME_DATA_CSV = "./outputs/game_data.csv"
+PLAY_DATA_CSV = "./outputs/play_data.csv"
 DATE_SUMMARY_DATA_CSV = "./outputs/date_summary_data.csv"
 
 class HockeyGame:
@@ -60,23 +61,66 @@ class dateSummary:
         self.numberOfGames =  numberOfGames
         self.avgHomeWins =  avgHomeWins
         self.avgAwayWins = avgAwayWins
-        
 
-def get_game_score_data():
+class playSummary:
+    def __init__(self, play_type, xLoc, yLoc, result):
+        self.play_type = play_type
+        self.xLoc = xLoc
+        self.yLoc = yLoc
+        self.result = result
+
+    
+        
+def get_game_play_data(game_id, play_list):
+    """
+    This function extracts data from the NHL API for every play that happens in a specific game.
+    
+
+    Parameters: Game ID, play_list array
+    """
+    api_url = f'https://statsapi.web.nhl.com/api/v1/game/{game_id}/feed/live'
+    try:
+        result = requests.get(api_url)
+    except:
+        # Request failed
+        print(f"Get response failed in get_game_play_data!")
+        return
+    # Request was successful
+    request_json = json.loads(result.content)
+    for play in request_json["liveData"]["plays"]["allPlays"]:
+        if play["result"]["event"] == "Shot" or play["result"]["event"] == "Goal":
+            if "secondaryType" in play["result"]:
+                shot_type = play["result"]["secondaryType"]
+                xLoc = play["coordinates"]["x"]
+                yLoc = play["coordinates"]["y"]
+                play_result = play["result"]["event"]
+                play_list.append(playSummary(shot_type, xLoc, yLoc, play_result))
+            else:
+                # This play does not have a secondaryType for some reason
+                pass
+        else:
+            # This was not a shot so we don't care what happened for now
+            pass
+    return play_list
+    
+
+
+def get_game_score_data(gather_play_data):
     """
     This function extracts data from the NHL API for every game from the desired season.
     As of right now the season is hard coded into the URL
     TODO: I need to fix that
 
-    No parameters are needed
+    Parameters: gather_play_data bool
     """
     gameList = []
+    playData = []
     #This will be where we gather all the game score data from the NHL API
     try:
         result = requests.get(URL_FOR_GAME_DATA_GATHERING)
     except:
         # Request failed
-        print(f"Get response failed!")
+        print(f"Get response failed in get_game_score_data!")
         exit()
     # Request was successful
     print("Get request was successful. Loading data into json object")
@@ -98,24 +142,32 @@ def get_game_score_data():
                 losingTeam = homeTeam
             gameType = game[GAME_TYPE]
             gameList.append(HockeyGame(gameID, gameDate, homeTeam, awayTeam, homeScore, awayScore, totalScore, winningTeam, losingTeam, gameType))
+            if gather_play_data:
+                playData = get_game_play_data(gameID, playData)
+
+
     gameDataFrame = pd.DataFrame([game.__dict__ for game in gameList])
     gameDataFrame.to_csv(GAME_DATA_CSV, index=False)
+    if gather_play_data:
+        playDataFrame = pd.DataFrame([play.__dict__ for play in playData])
+        playDataFrame.to_csv(PLAY_DATA_CSV, index=False)
 
 
         
-def get_daily_summary_from_game_score_data():
+def get_daily_summary_from_game_score_data(gather_play_data):
     """
     This function will take the game data from "./outputs/game_data.csv" and refine it down to just be about each specific day
     It will average out the number of games per day, whether the home or away team won more and so on. This will be much easier to
     work with later on.
 
-    No parameters are needed
+    Parameters: gather_play_data bool determines if we will gather the play data or not
      
     It automatically checks if the game data is available. If it is not it will retrieve it automatically.
     """
     # Initializing values
     dateSummaryList = []
     game_data_path = Path(GAME_DATA_CSV)
+    date_summary_path = Path(DATE_SUMMARY_DATA_CSV)
     current_date = ''
     avgTotalScore = 0
     avgHomeScore = 0
@@ -125,47 +177,49 @@ def get_daily_summary_from_game_score_data():
     avgAwayWins = 0
     if game_data_path.is_file() is False:
         print("We do not have game data yet. Getting it now.")
-        get_game_score_data()
-    with open(GAME_DATA_CSV, 'r') as game_data_file:
-        # Opening up the file so we can read it.
-        game_data = csv.DictReader(game_data_file, delimiter=',')
-        for game in game_data:
-            game_date = game[GAME_DATE]
-            if current_date == '':
-                # The date has not been initialized so we do that here.
-                current_date == game_date
-            elif current_date != game_date:
-                # The date has changed so we create a dateSummary object to store the current data and wipe the values to start fresh.
-                avgTotalScore = avgTotalScore / numberOfGames
-                avgHomeScore = avgHomeScore / numberOfGames
-                avgAwayScore = avgAwayScore / numberOfGames
-                avgHomeWins = avgHomeWins / numberOfGames
-                avgAwayWins = avgAwayWins / numberOfGames
+        get_game_score_data(gather_play_data)
+    if date_summary_path.is_file() is False:
+        with open(GAME_DATA_CSV, 'r') as game_data_file:
+            # Opening up the file so we can read it.
+            game_data = csv.DictReader(game_data_file, delimiter=',')
+            for game in game_data:
+                game_date = game[GAME_DATE]
+                if current_date == '':
+                    # The date has not been initialized so we do that here.
+                    current_date == game_date
+                elif current_date != game_date:
+                    # The date has changed so we create a dateSummary object to store the current data and wipe the values to start fresh.
+                    avgTotalScore = avgTotalScore / numberOfGames
+                    avgHomeScore = avgHomeScore / numberOfGames
+                    avgAwayScore = avgAwayScore / numberOfGames
+                    avgHomeWins = avgHomeWins / numberOfGames
+                    avgAwayWins = avgAwayWins / numberOfGames
 
-                current_date_dt = datetime.strptime(current_date, "%Y-%m-%d")
-                dayOfTheWeek = current_date_dt.weekday()
-                dateSummaryList.append(dateSummary(current_date, dayOfTheWeek, avgTotalScore, avgHomeScore, avgAwayScore, numberOfGames, avgHomeWins, avgAwayWins))
-                avgTotalScore = 0
-                avgHomeScore = 0
-                avgAwayScore = 0
-                numberOfGames = 0
-                avgHomeWins = 0
-                avgAwayWins = 0
-            current_date = game_date
-            avgTotalScore += int(game[TOTAL_SCORE])
-            avgHomeScore += int(game[HOME_SCORE])
-            avgAwayScore += int(game[AWAY_SCORE])
-            numberOfGames += 1
-            if game[WINNING_TEAM] == game[HOME_TEAM]:
-                avgHomeWins += 1
-            else:
-                avgAwayWins += 1
-    gameDataFrame = pd.DataFrame([day.__dict__ for day in dateSummaryList])
-    gameDataFrame.to_csv(DATE_SUMMARY_DATA_CSV, index=False)
+                    current_date_dt = datetime.strptime(current_date, "%Y-%m-%d")
+                    dayOfTheWeek = current_date_dt.weekday()
+                    dateSummaryList.append(dateSummary(current_date, dayOfTheWeek, avgTotalScore, avgHomeScore, avgAwayScore, numberOfGames, avgHomeWins, avgAwayWins))
+                    avgTotalScore = 0
+                    avgHomeScore = 0
+                    avgAwayScore = 0
+                    numberOfGames = 0
+                    avgHomeWins = 0
+                    avgAwayWins = 0
+                current_date = game_date
+                avgTotalScore += int(game[TOTAL_SCORE])
+                avgHomeScore += int(game[HOME_SCORE])
+                avgAwayScore += int(game[AWAY_SCORE])
+                numberOfGames += 1
+                if game[WINNING_TEAM] == game[HOME_TEAM]:
+                    avgHomeWins += 1
+                else:
+                    avgAwayWins += 1
+        gameDataFrame = pd.DataFrame([day.__dict__ for day in dateSummaryList])
+        gameDataFrame.to_csv(DATE_SUMMARY_DATA_CSV, index=False)
+    else:
+        print("The data already exists so we will not be running it again.")
             
 
     
         
 
-get_daily_summary_from_game_score_data()
-
+get_daily_summary_from_game_score_data(True)
