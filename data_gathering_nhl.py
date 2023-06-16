@@ -12,7 +12,7 @@ from pathlib import Path
 from datetime import datetime
 
 # This is the url for gathering game play data: https://statsapi.web.nhl.com/api/v1/game/ID/feed/live
-URL_FOR_GAME_DATA_GATHERING = "https://statsapi.web.nhl.com/api/v1/schedule?startDate=2021-08-01&endDate=2022-08-01&?expand=schedule.linescore"
+URL_FOR_GAME_DATA_GATHERING = "https://statsapi.web.nhl.com/api/v1/schedule?startDate=2018-10-01&endDate=2022-10-10&?expand=schedule.linescore"
 
 # DICT ATTRIBUTES
 DATES = "dates"
@@ -63,11 +63,11 @@ class dateSummary:
         self.avgAwayWins = avgAwayWins
 
 class playSummary:
-    def __init__(self, play_type, xLoc, yLoc, result):
+    def __init__(self, play_type, xLoc, yLoc):
         self.play_type = play_type
         self.xLoc = xLoc
         self.yLoc = yLoc
-        self.result = result
+        # self.result = result
 
     
         
@@ -91,10 +91,21 @@ def get_game_play_data(game_id, play_list):
         if play["result"]["event"] == "Shot" or play["result"]["event"] == "Goal":
             if "secondaryType" in play["result"]:
                 shot_type = play["result"]["secondaryType"]
-                xLoc = play["coordinates"]["x"]
-                yLoc = play["coordinates"]["y"]
-                play_result = play["result"]["event"]
-                play_list.append(playSummary(shot_type, xLoc, yLoc, play_result))
+                if "coordinates" in play:
+                    if "x" in play["coordinates"]:
+                        xLoc = float(play["coordinates"]["x"])
+                else:
+                    continue
+                if "coordinates" in play:
+                    if "y" in play["coordinates"]:
+                        yLoc = float(play["coordinates"]["y"])
+                else:
+                    continue
+                if play["result"]["event"] == "Goal":
+                    play_result = 1
+                else:
+                    play_result = 0
+                play_list.append(playSummary(xLoc, yLoc, play_result))
             else:
                 # This play does not have a secondaryType for some reason
                 pass
